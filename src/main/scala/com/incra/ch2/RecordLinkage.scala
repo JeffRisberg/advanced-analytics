@@ -69,7 +69,7 @@ object RecordLinkage extends Serializable {
       case(m, n) => (m.missing + n.missing, m.stats.mean - n.stats.mean)
     }.foreach(println)
 
-    /* check */
+    /* check the level of separation generated at two different threshold values */
     def naz(d: Double) = if (Double.NaN.equals(d)) 0.0 else d
 
     case class Scored(md: MatchData, score: Double)
