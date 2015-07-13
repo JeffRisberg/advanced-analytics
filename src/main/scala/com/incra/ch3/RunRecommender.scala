@@ -19,16 +19,24 @@ import org.apache.spark.rdd.RDD
 object RunRecommender {
 
   def main(args: Array[String]): Unit = {
-    val sc = new SparkContext(new SparkConf().setAppName("Recommender"))
+    val sc = new SparkContext("local", "Recommender", System.getenv("SPARK_HOME"))
+
     val base = "../../advanced-analytics/music/"
     val rawUserArtistData = sc.textFile(base + "user_artist_data.txt")
     val rawArtistData = sc.textFile(base + "artist_data.txt")
     val rawArtistAlias = sc.textFile(base + "artist_alias.txt")
 
+    println("Preparation")
     preparation(rawUserArtistData, rawArtistData, rawArtistAlias)
-    model(sc, rawUserArtistData, rawArtistData, rawArtistAlias)
-    evaluate(sc, rawUserArtistData, rawArtistAlias)
-    recommend(sc, rawUserArtistData, rawArtistData, rawArtistAlias)
+
+    //println("Model")
+    //model(sc, rawUserArtistData, rawArtistData, rawArtistAlias)
+
+    //println("Evaluate")
+    //evaluate(sc, rawUserArtistData, rawArtistAlias)
+
+    //println("Recommend")
+    //recommend(sc, rawUserArtistData, rawArtistData, rawArtistAlias)
   }
 
   def buildArtistByID(rawArtistData: RDD[String]) =
