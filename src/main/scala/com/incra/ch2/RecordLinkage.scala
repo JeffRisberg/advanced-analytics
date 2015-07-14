@@ -23,10 +23,10 @@ object RecordLinkage extends Serializable {
     /* load the data set from a textFile, into an RDD */
     val rawblocks = sc.textFile("../../advanced-analytics/linkage/data")
 
-    /* show the count (> 5Million records */
+    /* show the count (> 5Million records) */
     println(rawblocks.count())
 
-    /* learn a few conv functions on RDDs */
+    /* learn a few conv functions on RDDs.  Take is an action, and produces local content */
     val head = rawblocks.take(10)
 
     head.foreach(println)
@@ -52,7 +52,7 @@ object RecordLinkage extends Serializable {
 
     val grouped = mds.groupBy(md => md.matched)
 
-    /* find the most effective propty for matching */
+    /* find the most effective property for matching */
     val matchCounts = parsed.map(md => md.matched).countByValue()
 
     val matchCountsSeq = matchCounts.toSeq // make them sortable
@@ -66,7 +66,7 @@ object RecordLinkage extends Serializable {
 
     /* print the effectiveness measures for the properties */
     statsMatched.zip(statsNotMatched).map {
-      case(m, n) => (m.missing + n.missing, m.stats.mean - n.stats.mean)
+      case (m, n) => (m.missing + n.missing, m.stats.mean - n.stats.mean)
     }.foreach(println)
 
     /* check the level of separation generated at two different threshold values */
@@ -114,5 +114,6 @@ object RecordLinkage extends Serializable {
     })
     nastats.reduce((n1, n2) => {
       n1.zip(n2).map { case (a, b) => a.merge(b) }
-    }) }
+    })
+  }
 }
