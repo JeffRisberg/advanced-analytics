@@ -19,7 +19,11 @@ import org.apache.spark.rdd.RDD
 object RunRecommender {
 
   def main(args: Array[String]): Unit = {
-    val sc = new SparkContext("local", "Recommender", System.getenv("SPARK_HOME"))
+    val conf = new SparkConf()
+      .setAppName("Recommender")
+      .set("spark.executor.memory", "6g")
+      .setMaster("local[4]")
+    val sc = new SparkContext(conf)
 
     val base = "../../advanced-analytics/music/"
     val rawUserArtistData = sc.textFile(base + "user_artist_data.txt")
@@ -29,16 +33,19 @@ object RunRecommender {
     println("Preparation")
     preparation(rawUserArtistData, rawArtistData, rawArtistAlias)
 
-    //println("Model")
+    //println("Create model and train")
     //model(sc, rawUserArtistData, rawArtistData, rawArtistAlias)
 
     //println("Evaluate")
     //evaluate(sc, rawUserArtistData, rawArtistAlias)
 
-    //println("Recommend")
-    //recommend(sc, rawUserArtistData, rawArtistData, rawArtistAlias)
+    println("Recommend")
+    recommend(sc, rawUserArtistData, rawArtistData, rawArtistAlias)
   }
 
+  /**
+   * Convert RDD of Strings into tuples
+   */
   def buildArtistByID(rawArtistData: RDD[String]) =
     rawArtistData.flatMap { line =>
       val (id, name) = line.span(_ != '\t')
@@ -53,7 +60,10 @@ object RunRecommender {
       }
     }
 
-  def buildArtistAlias(rawArtistAlias: RDD[String]): Map[Int,Int] =
+  /**
+   * Convert RDD of Strings into tuples
+   */
+  def buildArtistAlias(rawArtistAlias: RDD[String]): Map[Int, Int] =
     rawArtistAlias.flatMap { line =>
       val tokens = line.split('\t')
       if (tokens(0).isEmpty) {
@@ -63,73 +73,100 @@ object RunRecommender {
       }
     }.collectAsMap()
 
-  def preparation(
-      rawUserArtistData: RDD[String],
-      rawArtistData: RDD[String],
-      rawArtistAlias: RDD[String]) = {
+  /**
+   * Generate stats
+   */
+  def preparation(rawUserArtistData: RDD[String], rawArtistData: RDD[String], rawArtistAlias: RDD[String]) = {
+    val start = System.currentTimeMillis()
     val userIDStats = rawUserArtistData.map(_.split(' ')(0).toDouble).stats()
     val itemIDStats = rawUserArtistData.map(_.split(' ')(1).toDouble).stats()
+
     println(userIDStats)
     println(itemIDStats)
 
+    // parse and validate the string-based RDD for artists
     val artistByID = buildArtistByID(rawArtistData)
+
+    // parse and validate the string-based RDD for aliases
     val artistAlias = buildArtistAlias(rawArtistAlias)
 
+    // pick a representative mapped and unmapped artist id
     val (badID, goodID) = artistAlias.head
+
     println(artistByID.lookup(badID) + " -> " + artistByID.lookup(goodID))
+    println((System.currentTimeMillis() - start) / 1000 + " seconds")
   }
 
-  def buildRatings(
-      rawUserArtistData: RDD[String],
-      bArtistAlias: Broadcast[Map[Int,Int]]) = {
-    rawUserArtistData.map { line =>
-      val Array(userID, artistID, count) = line.split(' ').map(_.toInt)
-      val finalArtistID = bArtistAlias.value.getOrElse(artistID, artistID)
-      Rating(userID, finalArtistID, count)
+  /**
+   * Given the full userArtistData as an RDD of strings, parse into tuples called Ratings
+   *
+   * The alias data is broadcast to all workers.
+   */
+  def buildRatings(rawUserArtistData: RDD[String], bArtistAlias: Broadcast[Map[Int, Int]]) = {
+    val start = System.currentTimeMillis()
+
+    try {
+      rawUserArtistData.map { line =>
+        val Array(userID, artistID, count) = line.split(' ').map(_.toInt)
+        val finalArtistID = bArtistAlias.value.getOrElse(artistID, artistID)
+
+        Rating(userID, finalArtistID, count)
+      }
+    }
+    finally {
+      println((System.currentTimeMillis() - start) / 1000 + " seconds")
     }
   }
 
+  /**
+   * Create a model and train it
+   */
   def model(
-      sc: SparkContext,
-      rawUserArtistData: RDD[String],
-      rawArtistData: RDD[String],
-      rawArtistAlias: RDD[String]): Unit = {
+             sc: SparkContext,
+             rawUserArtistData: RDD[String],
+             rawArtistData: RDD[String],
+             rawArtistAlias: RDD[String]): Unit = {
 
     val bArtistAlias = sc.broadcast(buildArtistAlias(rawArtistAlias))
 
     val trainData = buildRatings(rawUserArtistData, bArtistAlias).cache()
 
+    val start = System.currentTimeMillis()
+
     val model = ALS.trainImplicit(trainData, 10, 5, 0.01, 1.0)
+    println((System.currentTimeMillis() - start) / 1000 + " seconds to train model")
 
     trainData.unpersist()
 
     println(model.userFeatures.mapValues(_.mkString(", ")).first())
 
-    val userID = 2093760
-    val recommendations = model.recommendProducts(userID, 5)
-    recommendations.foreach(println)
-    val recommendedProductIDs = recommendations.map(_.product).toSet
+    /*
+       val userID = 2093760
+       val recommendations = model.recommendProducts(userID, 5)
+       recommendations.foreach(println)
+       val recommendedProductIDs = recommendations.map(_.product).toSet
 
-    val rawArtistsForUser = rawUserArtistData.map(_.split(' ')).
-      filter { case Array(user,_,_) => user.toInt == userID }
+       val rawArtistsForUser = rawUserArtistData.map(_.split(' ')).
+         filter { case Array(user,_,_) => user.toInt == userID }
 
-    val existingProducts = rawArtistsForUser.map { case Array(_,artist,_) => artist.toInt }.
-      collect().toSet
+       val existingProducts = rawArtistsForUser.map { case Array(_,artist,_) => artist.toInt }.
+         collect().toSet
 
-    val artistByID = buildArtistByID(rawArtistData)
+       val artistByID = buildArtistByID(rawArtistData)
 
-    artistByID.filter { case (id, name) => existingProducts.contains(id) }.
-      values.collect().foreach(println)
-    artistByID.filter { case (id, name) => recommendedProductIDs.contains(id) }.
-      values.collect().foreach(println)
+       artistByID.filter { case (id, name) => existingProducts.contains(id) }.
+         values.collect().foreach(println)
+       artistByID.filter { case (id, name) => recommendedProductIDs.contains(id) }.
+         values.collect().foreach(println)
 
-    unpersist(model)
+       unpersist(model)
+       */
   }
 
   def areaUnderCurve(
-      positiveData: RDD[Rating],
-      bAllItemIDs: Broadcast[Array[Int]],
-      predictFunction: (RDD[(Int,Int)] => RDD[Rating])) = {
+                      positiveData: RDD[Rating],
+                      bAllItemIDs: Broadcast[Array[Int]],
+                      predictFunction: (RDD[(Int, Int)] => RDD[Rating])) = {
     // What this actually computes is AUC, per user. The result is actually something
     // that might be called "mean AUC".
 
@@ -194,7 +231,10 @@ object RunRecommender {
     }.mean() // Return mean AUC over users
   }
 
-  def predictMostListened(sc: SparkContext, train: RDD[Rating])(allData: RDD[(Int,Int)]) = {
+  /**
+   * Why is this here?
+   */
+  def predictMostListened(sc: SparkContext, train: RDD[Rating])(allData: RDD[(Int, Int)]) = {
     val bListenCount =
       sc.broadcast(train.map(r => (r.product, r.rating)).reduceByKey(_ + _).collectAsMap())
     allData.map { case (user, product) =>
@@ -203,9 +243,9 @@ object RunRecommender {
   }
 
   def evaluate(
-      sc: SparkContext,
-      rawUserArtistData: RDD[String],
-      rawArtistAlias: RDD[String]): Unit = {
+                sc: SparkContext,
+                rawUserArtistData: RDD[String],
+                rawArtistAlias: RDD[String]): Unit = {
     val bArtistAlias = sc.broadcast(buildArtistAlias(rawArtistAlias))
 
     val allData = buildRatings(rawUserArtistData, bArtistAlias)
@@ -220,15 +260,15 @@ object RunRecommender {
     println(mostListenedAUC)
 
     val evaluations =
-      for (rank   <- Array(10,  50);
+      for (rank <- Array(10, 50);
            lambda <- Array(1.0, 0.0001);
-           alpha  <- Array(1.0, 40.0))
-      yield {
-        val model = ALS.trainImplicit(trainData, rank, 10, lambda, alpha)
-        val auc = areaUnderCurve(cvData, bAllItemIDs, model.predict)
-        unpersist(model)
-        ((rank, lambda, alpha), auc)
-      }
+           alpha <- Array(1.0, 40.0))
+        yield {
+          val model = ALS.trainImplicit(trainData, rank, 10, lambda, alpha)
+          val auc = areaUnderCurve(cvData, bAllItemIDs, model.predict)
+          unpersist(model)
+          ((rank, lambda, alpha), auc)
+        }
 
     evaluations.sortBy(_._2).reverse.foreach(println)
 
@@ -236,40 +276,56 @@ object RunRecommender {
     cvData.unpersist()
   }
 
+  /**
+   * Build ratings, training, recommend
+   * @param sc
+   * @param rawUserArtistData
+   * @param rawArtistData
+   * @param rawArtistAlias
+   */
   def recommend(
-      sc: SparkContext,
-      rawUserArtistData: RDD[String],
-      rawArtistData: RDD[String],
-      rawArtistAlias: RDD[String]): Unit = {
+                 sc: SparkContext,
+                 rawUserArtistData: RDD[String],
+                 rawArtistData: RDD[String],
+                 rawArtistAlias: RDD[String]): Unit = {
 
-    val bArtistAlias = sc.broadcast(buildArtistAlias(rawArtistAlias))
-    val allData = buildRatings(rawUserArtistData, bArtistAlias).cache()
-    val model = ALS.trainImplicit(allData, 50, 10, 1.0, 40.0)
+    val artistAlias = buildArtistAlias(rawArtistAlias)
+    val bArtistAlias = sc.broadcast(artistAlias)
+    val allData: RDD[Rating] = buildRatings(rawUserArtistData, bArtistAlias).cache()
+
+    val start = System.currentTimeMillis()
+    val model = ALS.trainImplicit(allData, 50, 2, 1.0, 40.0)
+    println((System.currentTimeMillis() - start) / 1000 + " seconds to train model")
+
     allData.unpersist()
 
-    val userID = 2093760
-    val recommendations = model.recommendProducts(userID, 5)
-    val recommendedProductIDs = recommendations.map(_.product).toSet
-
-    val artistByID = buildArtistByID(rawArtistData)
-
-    artistByID.filter { case (id, name) => recommendedProductIDs.contains(id) }.
-       values.collect().foreach(println)
-
-    val someUsers = allData.map(_.user).distinct().take(100)
-    val someRecommendations = someUsers.map(userID => model.recommendProducts(userID, 5))
-    someRecommendations.map(
-      recs => recs.head.user + " -> " + recs.map(_.product).mkString(", ")
-    ).foreach(println)
+    recommendForUserID(model, rawArtistData, 2093760)
+    recommendForUserID(model, rawArtistData, 1000002)
 
     unpersist(model)
   }
 
+  private def recommendForUserID(model: MatrixFactorizationModel, rawArtistData: RDD[String], userID: Integer) = {
+    println(s"generating recommendations for userId $userID")
+
+    val recommendations = model.recommendProducts(userID, 5)
+    val recommendedProductIDs = recommendations.map(_.product).toSet
+
+    val artistByID: RDD[(Int, String)] = buildArtistByID(rawArtistData)
+
+    // Check each artist to see if it is in the recommended list, and print its name
+    artistByID.filter { case (id, name) => recommendedProductIDs.contains(id) }
+      .values.collect().foreach(println)
+  }
+
+
   def unpersist(model: MatrixFactorizationModel): Unit = {
     // At the moment, it's necessary to manually unpersist the RDDs inside the model
     // when done with it in order to make sure they are promptly uncached
+    //
+    // Why is this true?
+
     model.userFeatures.unpersist()
     model.productFeatures.unpersist()
   }
-
 }
