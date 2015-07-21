@@ -30,8 +30,8 @@ object RunRecommender {
     val rawArtistData = sc.textFile(base + "artist_data.txt")
     val rawArtistAlias = sc.textFile(base + "artist_alias.txt")
 
-    println("Preparation")
-    preparation(rawUserArtistData, rawArtistData, rawArtistAlias)
+    //println("Preparation")
+    //preparation(rawUserArtistData, rawArtistData, rawArtistAlias)
 
     //println("Create model and train")
     //model(sc, rawUserArtistData, rawArtistData, rawArtistAlias)
@@ -140,27 +140,28 @@ object RunRecommender {
 
     println(model.userFeatures.mapValues(_.mkString(", ")).first())
 
+    val userID = 2093760
+    val recommendations = model.recommendProducts(userID, 5)
+    recommendations.foreach(println)
+
     /*
-       val userID = 2093760
-       val recommendations = model.recommendProducts(userID, 5)
-       recommendations.foreach(println)
-       val recommendedProductIDs = recommendations.map(_.product).toSet
+    val recommendedProductIDs = recommendations.map(_.product).toSet
 
-       val rawArtistsForUser = rawUserArtistData.map(_.split(' ')).
-         filter { case Array(user,_,_) => user.toInt == userID }
+    val rawArtistsForUser = rawUserArtistData.map(_.split(' ')).
+      filter { case Array(user,_,_) => user.toInt == userID }
 
-       val existingProducts = rawArtistsForUser.map { case Array(_,artist,_) => artist.toInt }.
-         collect().toSet
+    val existingProducts = rawArtistsForUser.map { case Array(_,artist,_) => artist.toInt }.
+      collect().toSet
 
-       val artistByID = buildArtistByID(rawArtistData)
+    val artistByID = buildArtistByID(rawArtistData)
 
-       artistByID.filter { case (id, name) => existingProducts.contains(id) }.
-         values.collect().foreach(println)
-       artistByID.filter { case (id, name) => recommendedProductIDs.contains(id) }.
-         values.collect().foreach(println)
+    artistByID.filter { case (id, name) => existingProducts.contains(id) }.
+      values.collect().foreach(println)
+    artistByID.filter { case (id, name) => recommendedProductIDs.contains(id) }.
+      values.collect().foreach(println)
+    */
 
-       unpersist(model)
-       */
+    unpersist(model)
   }
 
   def areaUnderCurve(
