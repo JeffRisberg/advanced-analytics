@@ -4,7 +4,7 @@ import org.apache.spark.mllib.evaluation.MulticlassMetrics
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.tree.{RandomForest, DecisionTree}
-import org.apache.spark.mllib.tree.model.DecisionTreeModel
+import org.apache.spark.mllib.tree.model.{Node, DecisionTreeModel}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
 
@@ -72,8 +72,25 @@ object RunRDF {
     val input4 = "2805,44,17,170,32,1902,222,200,108,2436,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
     println("should be 2")
     predict(model, input4)
+
+    println("Dumping the tree")
+    val topNode = model.topNode
+    showNode(topNode)
   }
 
+  def showNode(node: Node): Unit = {
+    println(node)
+
+    val leftNode = node.leftNode
+    val rightNode = node.rightNode
+
+    if (leftNode.isDefined) {
+      showNode(leftNode.get)
+    }
+    if (rightNode.isDefined) {
+      showNode(rightNode.get)
+    }
+  }
   def predict(model: DecisionTreeModel, line: String): Unit = {
     val values = line.split(',').map(_.toDouble)
     val featureVector = Vectors.dense(values)
