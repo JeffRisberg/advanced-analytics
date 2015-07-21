@@ -46,7 +46,7 @@ object RunRDF {
 
   def simpleDecisionTree(trainData: RDD[LabeledPoint], cvData: RDD[LabeledPoint]): Unit = {
     // Build a simple default DecisionTreeModel
-    val model = DecisionTree.trainClassifier(trainData, 7, Map[Int, Int](), "gini", 4, 100)
+    val model = DecisionTree.trainClassifier(trainData, 7, Map[Int, Int](), "gini", 5, 100)
 
     val metrics = getMetrics(model, cvData)
 
@@ -64,11 +64,21 @@ object RunRDF {
     val input2 = "2500,74,11,190,9,930,233,219,116,5279,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
     println("should be 5")
     predict(model, input2)
+
+    val input3 = "2952,107,11,42,7,5845,239,226,116,3509,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0"
+    println("should be 2")
+    predict(model, input3)
+
+    val input4 = "2805,44,17,170,32,1902,222,200,108,2436,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
+    println("should be 2")
+    predict(model, input4)
   }
 
-  def predict(model: DecisionTreeModel, input: String): Unit = {
-    val vector = Vectors.dense(input.split(',').map(_.toDouble))
-    println(model.predict(vector))
+  def predict(model: DecisionTreeModel, line: String): Unit = {
+    val values = line.split(',').map(_.toDouble)
+    val featureVector = Vectors.dense(values)
+
+    println(model.predict(featureVector)+1)
   }
 
   def getMetrics(model: DecisionTreeModel, data: RDD[LabeledPoint]): MulticlassMetrics = {
