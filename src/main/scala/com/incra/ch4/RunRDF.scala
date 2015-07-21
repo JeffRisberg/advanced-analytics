@@ -11,8 +11,14 @@ import org.apache.spark.{SparkConf, SparkContext}
 object RunRDF {
 
   def main(args: Array[String]): Unit = {
-    val sc = new SparkContext(new SparkConf().setAppName("RDF"))
-    val rawData = sc.textFile("hdfs:///user/ds/covtype.data")
+    val conf = new SparkConf()
+      .setAppName("RDF")
+      .set("spark.executor.memory", "6g")
+      .setMaster("local[4]")
+    val sc = new SparkContext(conf)
+
+    val base = "../../advanced-analytics/forestCover/"
+    val rawData = sc.textFile(base + "covtype.data")
 
     val data = rawData.map { line =>
       val values = line.split(',').map(_.toDouble)
@@ -27,6 +33,7 @@ object RunRDF {
     cvData.cache()
     testData.cache()
 
+    /*
     simpleDecisionTree(trainData, cvData)
     randomClassifier(trainData, cvData)
     evaluate(trainData, cvData, testData)
@@ -36,11 +43,12 @@ object RunRDF {
     trainData.unpersist()
     cvData.unpersist()
     testData.unpersist()
+    */
   }
 
   def simpleDecisionTree(trainData: RDD[LabeledPoint], cvData: RDD[LabeledPoint]): Unit = {
     // Build a simple default DecisionTreeModel
-    val model = DecisionTree.trainClassifier(trainData, 7, Map[Int,Int](), "gini", 4, 100)
+    val model = DecisionTree.trainClassifier(trainData, 7, Map[Int, Int](), "gini", 4, 100)
 
     val metrics = getMetrics(model, cvData)
 
@@ -77,17 +85,17 @@ object RunRDF {
   }
 
   def evaluate(
-      trainData: RDD[LabeledPoint],
-      cvData: RDD[LabeledPoint],
-      testData: RDD[LabeledPoint]): Unit = {
+                trainData: RDD[LabeledPoint],
+                cvData: RDD[LabeledPoint],
+                testData: RDD[LabeledPoint]): Unit = {
 
     val evaluations =
       for (impurity <- Array("gini", "entropy");
-           depth    <- Array(1, 20);
-           bins     <- Array(10, 300))
+           depth <- Array(1, 20);
+           bins <- Array(10, 300))
         yield {
           val model = DecisionTree.trainClassifier(
-            trainData, 7, Map[Int,Int](), impurity, depth, bins)
+            trainData, 7, Map[Int, Int](), impurity, depth, bins)
           val accuracy = getMetrics(model, cvData).precision
           ((impurity, depth, bins), accuracy)
         }
@@ -95,7 +103,7 @@ object RunRDF {
     evaluations.sortBy(_._2).reverse.foreach(println)
 
     val model = DecisionTree.trainClassifier(
-      trainData.union(cvData), 7, Map[Int,Int](), "entropy", 20, 300)
+      trainData.union(cvData), 7, Map[Int, Int](), "entropy", 20, 300)
     println(getMetrics(model, testData).precision)
     println(getMetrics(model, trainData.union(cvData)).precision)
   }
@@ -113,9 +121,9 @@ object RunRDF {
       LabeledPoint(label, featureVector)
     }
   }
-  
+
   def evaluateCategorical(rawData: RDD[String]): Unit = {
-    
+
     val data = unencodeOneHot(rawData)
 
     val Array(trainData, cvData, testData) = data.randomSplit(Array(0.8, 0.1, 0.1))
@@ -125,17 +133,17 @@ object RunRDF {
 
     val evaluations =
       for (impurity <- Array("gini", "entropy");
-           depth    <- Array(10, 20, 30);
-           bins     <- Array(40, 300))
-      yield {
-        // Specify value count for categorical features 10, 11
-        val model = DecisionTree.trainClassifier(
-          trainData, 7, Map(10 -> 4, 11 -> 40), impurity, depth, bins)
-        val trainAccuracy = getMetrics(model, trainData).precision
-        val cvAccuracy = getMetrics(model, cvData).precision
-        // Return train and CV accuracy
-        ((impurity, depth, bins), (trainAccuracy, cvAccuracy))
-      }
+           depth <- Array(10, 20, 30);
+           bins <- Array(40, 300))
+        yield {
+          // Specify value count for categorical features 10, 11
+          val model = DecisionTree.trainClassifier(
+            trainData, 7, Map(10 -> 4, 11 -> 40), impurity, depth, bins)
+          val trainAccuracy = getMetrics(model, trainData).precision
+          val cvAccuracy = getMetrics(model, cvData).precision
+          // Return train and CV accuracy
+          ((impurity, depth, bins), (trainAccuracy, cvAccuracy))
+        }
 
     evaluations.sortBy(_._2._2).reverse.foreach(println)
 
