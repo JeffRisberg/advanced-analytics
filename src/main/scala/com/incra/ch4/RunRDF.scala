@@ -33,17 +33,15 @@ object RunRDF {
     cvData.cache()
     testData.cache()
 
-    /*
     simpleDecisionTree(trainData, cvData)
-    randomClassifier(trainData, cvData)
-    evaluate(trainData, cvData, testData)
-    evaluateCategorical(rawData)
-    evaluateForest(rawData)
+    //randomClassifier(trainData, cvData)
+    //evaluate(trainData, cvData, testData)
+    //evaluateCategorical(rawData)
+    //evaluateForest(rawData)
 
     trainData.unpersist()
     cvData.unpersist()
     testData.unpersist()
-    */
   }
 
   def simpleDecisionTree(trainData: RDD[LabeledPoint], cvData: RDD[LabeledPoint]): Unit = {
@@ -58,6 +56,19 @@ object RunRDF {
     (0 until 7).map(
       category => (metrics.precision(category), metrics.recall(category))
     ).foreach(println)
+
+    val input1 = "2596,51,3,258,0,510,221,232,148,6279,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0"
+    println("should be 5")
+    predict(model, input1)
+
+    val input2 = "2500,74,11,190,9,930,233,219,116,5279,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0"
+    println("should be 5")
+    predict(model, input2)
+  }
+
+  def predict(model: DecisionTreeModel, input: String): Unit = {
+    val vector = Vectors.dense(input.split(',').map(_.toDouble))
+    println(model.predict(vector))
   }
 
   def getMetrics(model: DecisionTreeModel, data: RDD[LabeledPoint]): MulticlassMetrics = {
@@ -157,7 +168,6 @@ object RunRDF {
   }
 
   def evaluateForest(rawData: RDD[String]): Unit = {
-
     val data = unencodeOneHot(rawData)
 
     val Array(trainData, cvData) = data.randomSplit(Array(0.9, 0.1))
@@ -176,5 +186,4 @@ object RunRDF {
     val vector = Vectors.dense(input.split(',').map(_.toDouble))
     println(forest.predict(vector))
   }
-
 }
