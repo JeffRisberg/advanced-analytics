@@ -30,11 +30,12 @@ object RunKMeans {
     //clusteringTake2(rawData)
     //clusteringTake3(rawData)
     //clusteringTake4(rawData)
-    //anomalies(rawData)
+    anomalies(rawData)
   }
 
   // Clustering, Take 0
 
+  // just run with defaults
   def clusteringTake0(rawData: RDD[String]): Unit = {
 
     rawData.map(_.split(',').last).countByValue().toSeq.sortBy(_._2).reverse.foreach(println)
@@ -50,6 +51,7 @@ object RunKMeans {
     val data = labelsAndData.values.cache()
 
     val kmeans = new KMeans()
+    kmeans.setK(10)
     val model = kmeans.run(data)
 
     model.clusterCenters.foreach(println)
@@ -67,7 +69,7 @@ object RunKMeans {
   }
 
   // Clustering, Take 1
-
+  // compare different values of k
   def distance(a: Vector, b: Vector) =
     math.sqrt(a.toArray.zip(b.toArray).map(p => p._1 - p._2).map(d => d * d).sum)
 
@@ -138,7 +140,7 @@ object RunKMeans {
   }
 
   // Clustering, Take 2
-
+  // normalize first
   def buildNormalizationFunction(data: RDD[Vector]): (Vector => Vector) = {
     val dataAsArray = data.map(_.toArray)
     val numCols = dataAsArray.first().length
@@ -146,8 +148,8 @@ object RunKMeans {
     val sums = dataAsArray.reduce(
       (a, b) => a.zip(b).map(t => t._1 + t._2))
     val sumSquares = dataAsArray.fold(
-        new Array[Double](numCols)
-      )(
+      new Array[Double](numCols)
+    )(
         (a, b) => a.zip(b).map(t => t._1 + t._2 * t._2)
       )
     val stdevs = sumSquares.zip(sums).map {
@@ -158,7 +160,7 @@ object RunKMeans {
     (datum: Vector) => {
       val normalizedArray = (datum.toArray, means, stdevs).zipped.map(
         (value, mean, stdev) =>
-          if (stdev <= 0)  (value - mean) else  (value - mean) / stdev
+          if (stdev <= 0) (value - mean) else (value - mean) / stdev
       )
       Vectors.dense(normalizedArray)
     }
@@ -174,15 +176,15 @@ object RunKMeans {
 
     val normalizedData = data.map(buildNormalizationFunction(data)).cache()
 
-    (60 to 120 by 10).par.map(k =>
-      (k, clusteringScore2(normalizedData, k))).toList.foreach(println)
+      (60 to 120 by 10).par.map(k =>
+        (k, clusteringScore2(normalizedData, k))).toList.foreach(println)
 
     normalizedData.unpersist()
   }
 
   // Clustering, Take 3
 
-  def buildCategoricalAndLabelFunction(rawData: RDD[String]): (String => (String,Vector)) = {
+  def buildCategoricalAndLabelFunction(rawData: RDD[String]): (String => (String, Vector)) = {
     val splitData = rawData.map(_.split(','))
     val protocols = splitData.map(_(1)).distinct().collect().zipWithIndex.toMap
     val services = splitData.map(_(2)).distinct().collect().zipWithIndex.toMap
@@ -232,7 +234,7 @@ object RunKMeans {
     }.sum
   }
 
-  def clusteringScore3(normalizedLabelsAndData: RDD[(String,Vector)], k: Int) = {
+  def clusteringScore3(normalizedLabelsAndData: RDD[(String, Vector)], k: Int) = {
     val kmeans = new KMeans()
     kmeans.setK(k)
     kmeans.setRuns(10)
@@ -273,15 +275,15 @@ object RunKMeans {
   // Detect anomalies
 
   def buildAnomalyDetector(
-      data: RDD[Vector],
-      normalizeFunction: (Vector => Vector)): (Vector => Boolean) = {
+                            data: RDD[Vector],
+                            normalizeFunction: (Vector => Vector)): (Vector => Boolean) = {
     val normalizedData = data.map(normalizeFunction)
     normalizedData.cache()
 
     val kmeans = new KMeans()
-    kmeans.setK(150)
-    kmeans.setRuns(10)
-    kmeans.setEpsilon(1.0e-6)
+    kmeans.setK(100)
+    //kmeans.setRuns(10)
+    //kmeans.setEpsilon(1.0e-6)
     val model = kmeans.run(normalizedData)
 
     normalizedData.unpersist()
@@ -296,8 +298,11 @@ object RunKMeans {
     val parseFunction = buildCategoricalAndLabelFunction(rawData)
     val originalAndData = rawData.map(line => (line, parseFunction(line)._2))
     val data = originalAndData.values
+
     val normalizeFunction = buildNormalizationFunction(data)
+
     val anomalyDetector = buildAnomalyDetector(data, normalizeFunction)
+
     val anomalies = originalAndData.filter {
       case (original, datum) => anomalyDetector(datum)
     }.keys
