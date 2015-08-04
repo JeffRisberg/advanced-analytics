@@ -57,15 +57,15 @@ object RunLSA {
   def preprocessing(sampleSize: Double, numTerms: Int, sc: SparkContext)
   : (RDD[Vector], Map[Int, String], Map[Long, String], Map[String, Double]) = {
 
+    val stopWords = sc.broadcast(loadStopWords("./resources/stopwords.txt")).value
+
     val pages = readFile("hdfs:///user/ds/Wikipedia/", sc)
     //.sample(false, sampleSize, 11L)
 
     println(pages.count)
     println(pages.collect)
 
-    val plainText = pages.filter(_ != null).flatMap(wikiXmlToPlainText)
-
-    val stopWords = sc.broadcast(loadStopWords("./resources/stopwords.txt")).value
+    val plainText = pages.filter(_ != null).flatMap(page => wikiXmlToPlainText(page, stopWords))
 
     // commented out the lemmatizer/stemmer
     // and to make up for this, changed the result of wikiXMLToPlainText to return RDD[(String,Seq[String])]
