@@ -120,19 +120,29 @@ object ParseWikipedia {
     val data = Array(
       "Doc1::data scientists process data and build models",
       "Doc2::ios engineers build apps",
-      "Doc3::data engineers prepare data")
+      "Doc3::data engineers prepare data",
+      "Doc4::lorem ipsum",
+      "Doc5::nulla fascili",
+      "Doc6::the cow jumped over the moon",
+      "Doc7::now is the time",
+      "Doc8::one if by land two if by sea",
+      "Doc9::the rain in spain is mainly on the plain",
+      "Doc10::only one life to live for my country",
+      "Doc11::all good people turn their heads each so satisifed",
+      "Doc12::this is the place this is really the place")
     sc.parallelize(data)
   }
 
   /**
    * Returns a (title, content) pair
    */
-  def wikiXmlToPlainText(pageXml: String): Option[(String, String)] = {
+  // changed to return Seq[String] for the second value in the tuple
+  def wikiXmlToPlainText(pageXml: String): Option[(String, Seq[String])] = {
     val splitPage = pageXml.split("::")
 
     val title = splitPage(0)
     val content = splitPage(1)
-    Some(title, content)
+    Some(title, content.split(" ").toSeq) // content.split(" ").toSeq is a crude lemmatizer
     /*
     val page = new EnglishWikipediaPage()
     WikipediaPage.readPage(page, pageXml)

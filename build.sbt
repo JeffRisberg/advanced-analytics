@@ -12,4 +12,6 @@ libraryDependencies += "org.apache.spark" %% "spark-mllib" % "1.3.1"
 
 libraryDependencies += "edu.stanford.nlp" % "stanford-corenlp" % "3.3.1"
 
+libraryDependencies += "edu.stanford.nlp" % "stanford-corenlp" % "3.3.1" classifier "models"
+
 resolvers += Resolver.sonatypeRepo("public")

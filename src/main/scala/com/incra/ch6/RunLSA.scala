@@ -22,7 +22,8 @@ import scala.collection.mutable.ArrayBuffer
 
 object RunLSA {
   def main(args: Array[String]) {
-    val k = if (args.length > 0) args(0).toInt else 100
+    // changed 100 to 10
+    val k = if (args.length > 0) args(0).toInt else 10
     val numTerms = if (args.length > 1) args(1).toInt else 50000
     val sampleSize = if (args.length > 2) args(2).toDouble else 0.1
 
@@ -37,7 +38,7 @@ object RunLSA {
     val (termDocMatrix, termIds, docIds, idfs) = preprocessing(sampleSize, numTerms, sc)
     termDocMatrix.cache()
     val mat = new RowMatrix(termDocMatrix)
-    val svd = mat.computeSVD(k, computeU=true)
+    val svd = mat.computeSVD(k, computeU = true)
 
     println("Singular values: " + svd.s)
     val topConceptTerms = topTermsInTopConcepts(svd, 10, 10, termIds)
@@ -54,10 +55,10 @@ object RunLSA {
    * mapping of row IDs to document titles.
    */
   def preprocessing(sampleSize: Double, numTerms: Int, sc: SparkContext)
-      : (RDD[Vector], Map[Int, String], Map[Long, String], Map[String, Double]) = {
+  : (RDD[Vector], Map[Int, String], Map[Long, String], Map[String, Double]) = {
 
     val pages = readFile("hdfs:///user/ds/Wikipedia/", sc)
-      //.sample(false, sampleSize, 11L)
+    //.sample(false, sampleSize, 11L)
 
     println(pages.count)
     println(pages.collect)
@@ -66,18 +67,22 @@ object RunLSA {
 
     val stopWords = sc.broadcast(loadStopWords("./resources/stopwords.txt")).value
 
+    // commented out the lemmatizer/stemmer
+    // and to make up for this, changed the result of wikiXMLToPlainText to return RDD[(String,Seq[String])]
+    // since the lemmater would be changing the page content from String to Seq[String]
+    /*
     val lemmatized = plainText.mapPartitions(iter => {
       val pipeline = createNLPPipeline()
       iter.map{ case(title, contents) => (title, plainTextToLemmas(contents, stopWords, pipeline))}
     })
 
     val filtered = lemmatized.filter(_._2.size > 1)
-
-    termDocumentMatrix(filtered, stopWords, numTerms, sc)
+*/
+    termDocumentMatrix(plainText, stopWords, numTerms, sc)
   }
 
   def topTermsInTopConcepts(svd: SingularValueDecomposition[RowMatrix, Matrix], numConcepts: Int,
-      numTerms: Int, termIds: Map[Int, String]): Seq[Seq[(String, Double)]] = {
+                            numTerms: Int, termIds: Map[Int, String]): Seq[Seq[(String, Double)]] = {
     val v = svd.V
     val topTerms = new ArrayBuffer[Seq[(String, Double)]]()
     val arr = v.toArray
@@ -85,18 +90,18 @@ object RunLSA {
       val offs = i * v.numRows
       val termWeights = arr.slice(offs, offs + v.numRows).zipWithIndex
       val sorted = termWeights.sortBy(-_._1)
-      topTerms += sorted.take(numTerms).map{case (score, id) => (termIds(id), score)}
+      topTerms += sorted.take(numTerms).map { case (score, id) => (termIds(id), score) }
     }
     topTerms
   }
 
   def topDocsInTopConcepts(svd: SingularValueDecomposition[RowMatrix, Matrix], numConcepts: Int,
-      numDocs: Int, docIds: Map[Long, String]): Seq[Seq[(String, Double)]] = {
-    val u  = svd.U
+                           numDocs: Int, docIds: Map[Long, String]): Seq[Seq[(String, Double)]] = {
+    val u = svd.U
     val topDocs = new ArrayBuffer[Seq[(String, Double)]]()
     for (i <- 0 until numConcepts) {
       val docWeights = u.rows.map(_.toArray(i)).zipWithUniqueId
-      topDocs += docWeights.top(numDocs).map{case (score, id) => (docIds(id), score)}
+      topDocs += docWeights.top(numDocs).map { case (score, id) => (docIds(id), score) }
     }
     topDocs
   }
@@ -130,7 +135,7 @@ object RunLSA {
   def multiplyByDiagonalMatrix(mat: Matrix, diag: Vector): BDenseMatrix[Double] = {
     val sArr = diag.toArray
     new BDenseMatrix[Double](mat.numRows, mat.numCols, mat.toArray)
-      .mapPairs{case ((r, c), v) => v * sArr(c)}
+      .mapPairs { case ((r, c), v) => v * sArr(c) }
   }
 
   /**
@@ -218,14 +223,14 @@ object RunLSA {
   }
 
   def termsToQueryVector(terms: Seq[String], idTerms: Map[String, Int], idfs: Map[String, Double])
-    : BSparseVector[Double] = {
+  : BSparseVector[Double] = {
     val indices = terms.map(idTerms(_)).toArray
     val values = terms.map(idfs(_)).toArray
     new BSparseVector[Double](indices, values, idTerms.size)
   }
 
   def topDocsForTermQuery(US: RowMatrix, V: Matrix, query: BSparseVector[Double])
-    : Seq[(Double, Long)] = {
+  : Seq[(Double, Long)] = {
     val breezeV = new BDenseMatrix[Double](V.numRows, V.numCols, V.toArray)
     val termRowArr = (breezeV.t * query).toArray
 
@@ -240,21 +245,21 @@ object RunLSA {
   }
 
   def printTopTermsForTerm(normalizedVS: BDenseMatrix[Double],
-      term: String, idTerms: Map[String, Int], termIds: Map[Int, String]) {
+                           term: String, idTerms: Map[String, Int], termIds: Map[Int, String]) {
     printIdWeights(topTermsForTerm(normalizedVS, idTerms(term)), termIds)
   }
 
   def printTopDocsForDoc(normalizedUS: RowMatrix, doc: String, idDocs: Map[String, Long],
-      docIds: Map[Long, String]) {
+                         docIds: Map[Long, String]) {
     printIdWeights(topDocsForDoc(normalizedUS, idDocs(doc)), docIds)
   }
 
   def printTopDocsForTerm(US: RowMatrix, V: Matrix, term: String, idTerms: Map[String, Int],
-      docIds: Map[Long, String]) {
+                          docIds: Map[Long, String]) {
     printIdWeights(topDocsForTerm(US, V, idTerms(term)), docIds)
   }
 
   def printIdWeights[T](idWeights: Seq[(Double, T)], entityIds: Map[T, String]) {
-    println(idWeights.map{case (score, id) => (entityIds(id), score)}.mkString(", "))
+    println(idWeights.map { case (score, id) => (entityIds(id), score) }.mkString(", "))
   }
 }
