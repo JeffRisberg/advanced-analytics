@@ -48,6 +48,15 @@ object RunLSA {
       println("Concept docs: " + docs.map(_._1).mkString(", "))
       println()
     }
+
+    println(termIds(1))
+    printTopDocsForTermId(svd.U, svd.V, 1, docIds)
+
+    println(termIds(2))
+    printTopDocsForTermId(svd.U, svd.V, 2, docIds)
+
+    println(termIds(3))
+    printTopDocsForTermId(svd.U, svd.V, 3, docIds)
   }
 
   /**
@@ -257,6 +266,11 @@ object RunLSA {
   def printTopDocsForTerm(US: RowMatrix, V: Matrix, term: String, idTerms: Map[String, Int],
                           docIds: Map[Long, String]) {
     printIdWeights(topDocsForTerm(US, V, idTerms(term)), docIds)
+  }
+
+
+  def printTopDocsForTermId(US: RowMatrix, V: Matrix, termId: Int, docIds: Map[Long, String]) {
+    printIdWeights(topDocsForTerm(US, V, termId), docIds)
   }
 
   def printIdWeights[T](idWeights: Seq[(Double, T)], entityIds: Map[T, String]) {
