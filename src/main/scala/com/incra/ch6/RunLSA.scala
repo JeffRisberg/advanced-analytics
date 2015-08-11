@@ -76,18 +76,18 @@ object RunLSA {
 
     val plainText = pages.filter(_ != null).flatMap(page => wikiXmlToPlainText(page, stopWords))
 
-    // commented out the lemmatizer/stemmer
-    // and to make up for this, changed the result of wikiXMLToPlainText to return RDD[(String,Seq[String])]
-    // since the lemmater would be changing the page content from String to Seq[String]
-    /*
     val lemmatized = plainText.mapPartitions(iter => {
       val pipeline = createNLPPipeline()
-      iter.map{ case(title, contents) => (title, plainTextToLemmas(contents, stopWords, pipeline))}
+      iter.map{ case(title, contents) =>
+        val lemmas = plainTextToLemmas(contents, stopWords, pipeline)
+        println(lemmas)
+        (title, lemmas)
+      }
     })
 
     val filtered = lemmatized.filter(_._2.size > 1)
-*/
-    termDocumentMatrix(plainText, stopWords, numTerms, sc)
+
+    termDocumentMatrix(filtered, stopWords, numTerms, sc)
   }
 
   def topTermsInTopConcepts(svd: SingularValueDecomposition[RowMatrix, Matrix], numConcepts: Int,
