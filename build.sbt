@@ -19,3 +19,5 @@ libraryDependencies += "edu.stanford.nlp" % "stanford-corenlp" % "3.3.1" classif
 libraryDependencies += "org.apache.hadoop" % "hadoop-client" % "2.4.0"
 
 libraryDependencies += "com.cloudera.datascience" % "common" % "1.0.0"
+
+resolvers += Resolver.mavenLocal

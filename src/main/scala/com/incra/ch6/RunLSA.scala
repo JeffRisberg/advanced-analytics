@@ -22,8 +22,8 @@ import scala.collection.mutable.ArrayBuffer
 
 object RunLSA {
   def main(args: Array[String]) {
-    // changed 100 to 10
-    val k = if (args.length > 0) args(0).toInt else 10
+    // changed 100 to 6
+    val k = if (args.length > 0) args(0).toInt else 6
     val numTerms = if (args.length > 1) args(1).toInt else 50000
     val sampleSize = if (args.length > 2) args(2).toDouble else 0.1
 
@@ -38,11 +38,13 @@ object RunLSA {
     val (termDocMatrix, termIds, docIds, idfs) = preprocessing(sampleSize, numTerms, sc)
     termDocMatrix.cache()
     val mat = new RowMatrix(termDocMatrix)
+
+    println("about to start SVD")
     val svd = mat.computeSVD(k, computeU = true)
 
     println("Singular values: " + svd.s)
-    val topConceptTerms = topTermsInTopConcepts(svd, 10, 10, termIds)
-    val topConceptDocs = topDocsInTopConcepts(svd, 10, 10, docIds)
+    val topConceptTerms = topTermsInTopConcepts(svd, k, k, termIds)
+    val topConceptDocs = topDocsInTopConcepts(svd, k, k, docIds)
     for ((terms, docs) <- topConceptTerms.zip(topConceptDocs)) {
       println("Concept terms: " + terms.map(_._1).mkString(", "))
       println("Concept docs: " + docs.map(_._1).mkString(", "))
@@ -57,6 +59,8 @@ object RunLSA {
 
     println(termIds(3))
     printTopDocsForTermId(svd.U, svd.V, 3, docIds)
+
+    //printTopDocsForDoc(svd.U, "Doc1", idDocs, docIds)
   }
 
   /**
@@ -68,17 +72,15 @@ object RunLSA {
 
     val stopWords = sc.broadcast(loadStopWords("./resources/stopwords.txt")).value
 
-    val pages = readFile("hdfs:///user/ds/Wikipedia/", sc)
-    //.sample(false, sampleSize, 11L)
+    val pages = readFile(sc)
 
     println(pages.count)
-    println(pages.collect)
 
     val plainText = pages.filter(_ != null).flatMap(page => wikiXmlToPlainText(page, stopWords))
 
     val lemmatized = plainText.mapPartitions(iter => {
       val pipeline = createNLPPipeline()
-      iter.map{ case(title, contents) =>
+      iter.map { case (title, contents) =>
         val lemmas = plainTextToLemmas(contents, stopWords, pipeline)
         println(lemmas)
         (title, lemmas)
