@@ -24,9 +24,17 @@ import scala.xml._
 object RunGraph extends Serializable {
 
   def main(args: Array[String]): Unit = {
-    val sc = new SparkContext(new SparkConf().setAppName("Graph"))
 
-    val medlineRaw = loadMedline(sc, "hdfs:///user/ds/medline")
+    val conf = new SparkConf()
+      .setAppName("Graph")
+      .set("spark.executor.memory", "6g")
+      .setMaster("local[4]")
+
+    val sc = new SparkContext(conf)
+
+    val base = "../../advanced-analytics/medline_data/"
+
+    val medlineRaw = loadMedline(sc, base + "medline15n0033.xml")
     val mxml: RDD[Elem] = medlineRaw.map(XML.loadString)
     val medline: RDD[Seq[String]] = mxml.map(majorTopics).cache()
 
@@ -34,29 +42,33 @@ object RunGraph extends Serializable {
     val topicCounts = topics.countByValue()
     val tcSeq = topicCounts.toSeq
     tcSeq.sortBy(_._2).reverse.take(10).foreach(println)
+
     val valueDist = topicCounts.groupBy(_._2).mapValues(_.size)
     valueDist.toSeq.sorted.take(10).foreach(println)
 
     val topicPairs = medline.flatMap(t => t.sorted.combinations(2))
-    val cooccurs = topicPairs.map(p => (p, 1)).reduceByKey(_+_)
+    val cooccurs = topicPairs.map(p => (p, 1)).reduceByKey(_ + _)
     cooccurs.cache()
     cooccurs.count()
 
-    cooccurs.top(10)(Ordering.by[(Seq[String], Int), Int](_._2)).foreach(println) 
+    cooccurs.top(10)(Ordering.by[(Seq[String], Int), Int](_._2)).foreach(println)
 
     val vertices = topics.map(topic => (hashId(topic), topic))
     val edges = cooccurs.map(p => {
-     val (topics, cnt) = p
-     val ids = topics.map(hashId).sorted
-     Edge(ids(0), ids(1), cnt)
+      val (topics, cnt) = p
+      val ids = topics.map(hashId).sorted
+      Edge(ids(0), ids(1), cnt)
     })
     val topicGraph = Graph(vertices, edges)
     topicGraph.cache()
 
+    println("number of vertices:" + vertices.count())
+    println(topicGraph.vertices.count())
+
     val connectedComponentGraph = topicGraph.connectedComponents()
     val componentCounts = sortedConnectedComponents(connectedComponentGraph)
     componentCounts.size
-    componentCounts.take(10)foreach(println)
+    componentCounts.take(10) foreach (println)
 
     val nameCID = topicGraph.vertices.innerJoin(connectedComponentGraph.vertices) {
       (topicId, name, componentId) => (name, componentId)
@@ -64,15 +76,17 @@ object RunGraph extends Serializable {
     val c1 = nameCID.filter(x => x._2._2 == componentCounts(1)._1)
     c1.collect().foreach(x => println(x._2._1))
 
-    val hiv = topics.filter(_.contains("HIV")).countByValue
-    hiv.foreach(println)
+    val fertilization = topics.filter(_.contains("Fertil")).countByValue
+    fertilization.foreach(println)
+
+    println("\n\n\FROM HERE ON ARE THE INTERESTING STATS\n\n")
 
     val degrees: VertexRDD[Int] = topicGraph.degrees.cache()
     degrees.map(_._2).stats()
     topNamesAndDegrees(degrees, topicGraph).foreach(println)
 
     val T = medline.count()
-    val topicCountsRdd = topics.map(x => (hashId(x), 1)).reduceByKey(_+_)
+    val topicCountsRdd = topics.map(x => (hashId(x), 1)).reduceByKey(_ + _)
     val topicCountGraph = Graph(topicCountsRdd, topicGraph.edges)
     val chiSquaredGraph = topicCountGraph.mapTriplets(triplet => {
       chiSq(triplet.attr, triplet.srcAttr, triplet.dstAttr, T)
@@ -104,7 +118,7 @@ object RunGraph extends Serializable {
   }
 
   def topNamesAndDegrees(degrees: VertexRDD[Int], topicGraph: Graph[String, Int])
-    : Array[(String, Int)] = {
+  : Array[(String, Int)] = {
     val namesAndDegrees = degrees.innerJoin(topicGraph.vertices) {
       (topicId, degree, name) => (name, degree)
     }
@@ -122,7 +136,7 @@ object RunGraph extends Serializable {
   }
 
   def samplePathLengths[V, E](graph: Graph[V, E], fraction: Double = 0.02)
-    : RDD[(VertexId, VertexId, Int)] = {
+  : RDD[(VertexId, VertexId, Int)] = {
     val replacement = false
     val sample = graph.vertices.map(v => v._1).sample(
       replacement, fraction, 1729L)
@@ -162,12 +176,12 @@ object RunGraph extends Serializable {
   }
 
   def update(id: VertexId, state: Map[VertexId, Int], msg: Map[VertexId, Int])
-    : Map[VertexId, Int] = {
+  : Map[VertexId, Int] = {
     mergeMaps(state, msg)
   }
 
   def checkIncrement(a: Map[VertexId, Int], b: Map[VertexId, Int], bid: VertexId)
-    : Iterator[(VertexId, Map[VertexId, Int])] = {
+  : Iterator[(VertexId, Map[VertexId, Int])] = {
     val aplus = a.map { case (v, d) => v -> (d + 1) }
     if (b != mergeMaps(aplus, b)) {
       Iterator((bid, aplus))
@@ -178,7 +192,7 @@ object RunGraph extends Serializable {
 
   def iterate(e: EdgeTriplet[Map[VertexId, Int], _]): Iterator[(VertexId, Map[VertexId, Int])] = {
     checkIncrement(e.srcAttr, e.dstAttr, e.dstId) ++
-    checkIncrement(e.dstAttr, e.srcAttr, e.srcId)
+      checkIncrement(e.dstAttr, e.srcAttr, e.srcId)
   }
 
   def loadMedline(sc: SparkContext, path: String): RDD[String] = {
@@ -202,13 +216,13 @@ object RunGraph extends Serializable {
     // of the (16 byte) MD5 hash, with first byte as least-significant byte in the long.
     val bytes = MessageDigest.getInstance("MD5").digest(str.getBytes(StandardCharsets.UTF_8))
     (bytes(0) & 0xFFL) |
-    ((bytes(1) & 0xFFL) << 8) |
-    ((bytes(2) & 0xFFL) << 16) |
-    ((bytes(3) & 0xFFL) << 24) |
-    ((bytes(4) & 0xFFL) << 32) |
-    ((bytes(5) & 0xFFL) << 40) |
-    ((bytes(6) & 0xFFL) << 48) |
-    ((bytes(7) & 0xFFL) << 56)
+      ((bytes(1) & 0xFFL) << 8) |
+      ((bytes(2) & 0xFFL) << 16) |
+      ((bytes(3) & 0xFFL) << 24) |
+      ((bytes(4) & 0xFFL) << 32) |
+      ((bytes(5) & 0xFFL) << 40) |
+      ((bytes(6) & 0xFFL) << 48) |
+      ((bytes(7) & 0xFFL) << 56)
   }
 
   def chiSq(YY: Int, YB: Int, YA: Int, T: Long): Double = {
