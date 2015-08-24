@@ -79,7 +79,7 @@ object RunGraph extends Serializable {
     val fertilization = topics.filter(_.contains("Fertil")).countByValue
     fertilization.foreach(println)
 
-    println("\n\n\FROM HERE ON ARE THE INTERESTING STATS\n\n")
+    println("\n\nFROM HERE ON ARE THE INTERESTING STATS\n\n")
 
     val degrees: VertexRDD[Int] = topicGraph.degrees.cache()
     degrees.map(_._2).stats()

@@ -4,6 +4,12 @@ version := "0.2"
 
 scalaVersion := "2.10.5"
 
+libraryDependencies += "com.github.nscala-time" %% "nscala-time" % "2.0.0"
+
+libraryDependencies += "io.spray" %% "spray-json" % "1.1.1"
+
+libraryDependencies += "com.esi.geometry" % "esri-geometry-api" % "1.2.1"
+
 libraryDependencies += "com.github.scopt" %% "scopt" % "3.2.0"
 
 libraryDependencies += "org.apache.spark" %% "spark-core" % "1.3.1"
