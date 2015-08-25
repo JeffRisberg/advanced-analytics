@@ -1,12 +1,4 @@
-/*
- * Copyright 2015 Sanford Ryza, Uri Laserson, Sean Owen and Joshua Wills
- *
- * See LICENSE file for further information.
- */
-
 package com.incra.ch8
-
-import com.cloudera.datascience.geotime.GeoJsonProtocol._
 
 import com.esri.core.geometry.Point
 
