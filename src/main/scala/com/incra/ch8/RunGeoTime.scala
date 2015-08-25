@@ -15,6 +15,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.reflect.ClassTag
 
 import spray.json._
+import com.incra.ch8.GeoJsonProtocol._
 
 case class Trip(
   pickupTime: DateTime,
