@@ -18,18 +18,27 @@ import spray.json._
 import com.incra.ch8.GeoJsonProtocol._
 
 case class Trip(
-  pickupTime: DateTime,
-  dropoffTime: DateTime,
-  pickupLoc: Point,
-  dropoffLoc: Point)
+                 pickupTime: DateTime,
+                 dropoffTime: DateTime,
+                 pickupLoc: Point,
+                 dropoffLoc: Point)
 
 object RunGeoTime extends Serializable {
 
   val formatter = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
 
   def main(args: Array[String]): Unit = {
-    val sc = new SparkContext(new SparkConf().setAppName("GeoTime"))
-    val taxiRaw = sc.textFile("taxidata")
+
+    val conf = new SparkConf()
+      .setAppName("GeoTime")
+      .set("spark.executor.memory", "6g")
+      .setMaster("local[1]")
+
+    val sc = new SparkContext(conf)
+
+    val base = "../../advanced-analytics/taxidata/"
+
+    val taxiRaw = sc.textFile(base + "trip_data_100k.csv")
 
     val safeParse = safe(parse)
     val taxiParsed = taxiRaw.map(safeParse)
@@ -38,6 +47,7 @@ object RunGeoTime extends Serializable {
     val taxiBad = taxiParsed.collect({
       case t if t.isRight => t.right.get
     })
+    println("here is the list of bad records")
     taxiBad.collect().foreach(println)
 
     val taxiGood = taxiParsed.collect({
@@ -59,17 +69,22 @@ object RunGeoTime extends Serializable {
       }
     }
 
-    val geojson = scala.io.Source.fromURL(getClass.getResource("/nyc-boroughs.geojson")).mkString
+    val geojson = scala.io.Source.fromFile("./resources/nyc-boroughs.geojson").getLines().mkString
 
     val features = geojson.parseJson.convertTo[FeatureCollection]
+
+    //features.foreach( feature => println(feature.geometry.area2D()) )
+
     val areaSortedFeatures = features.sortBy(f => {
       val borough = f("boroughCode").convertTo[Int]
       (borough, -f.geometry.area2D())
     })
 
+    areaSortedFeatures.foreach(println)
+
     val bFeatures = sc.broadcast(areaSortedFeatures)
 
-    def borough(trip: Trip): Option[String] = {
+    def boroughDropOff(trip: Trip): Option[String] = {
       val feature: Option[Feature] = bFeatures.value.find(f => {
         f.geometry.contains(trip.dropoffLoc)
       })
@@ -78,7 +93,7 @@ object RunGeoTime extends Serializable {
       })
     }
 
-    taxiClean.values.map(borough).countByValue().foreach(println)
+    taxiClean.values.map(boroughDropOff).countByValue().foreach(println)
 
     def hasZero(trip: Trip): Boolean = {
       val zero = new Point(0.0, 0.0)
@@ -89,14 +104,14 @@ object RunGeoTime extends Serializable {
       case (lic, trip) => !hasZero(trip)
     }.cache()
 
-    taxiDone.values.map(borough).countByValue().foreach(println)
+    taxiDone.values.map(boroughDropOff).countByValue().foreach(println)
 
     def secondaryKeyFunc(trip: Trip) = trip.pickupTime.getMillis
     val sessions = groupByKeyAndSortValues(taxiDone, secondaryKeyFunc, split, 30)
     sessions.cache()
 
     def boroughDuration(t1: Trip, t2: Trip): (Option[String], Duration) = {
-      val b = borough(t1)
+      val b = boroughDropOff(t1)
       val d = new Duration(t1.dropoffTime, t2.pickupTime)
       (b, d)
     }
@@ -115,8 +130,7 @@ object RunGeoTime extends Serializable {
     }.mapValues(d => {
       val s = new StatCounter()
       s.merge(d.getStandardSeconds)
-    }).
-    reduceByKey((a, b) => a.merge(b)).collect().foreach(println)
+    }).reduceByKey((a, b) => a.merge(b)).collect().foreach(println)
   }
 
   def point(longitude: String, latitude: String): Point = {
@@ -154,24 +168,24 @@ object RunGeoTime extends Serializable {
     d.getStandardHours >= 4
   }
 
-  def groupByKeyAndSortValues[K : Ordering : ClassTag, V : ClassTag, S](
-      rdd: RDD[(K, V)],
-      secondaryKeyFunc: (V) => S,
-      splitFunc: (V, V) => Boolean,
-      numPartitions: Int): RDD[(K, List[V])] = {
+  def groupByKeyAndSortValues[K: Ordering : ClassTag, V: ClassTag, S](
+                                                                       rdd: RDD[(K, V)],
+                                                                       secondaryKeyFunc: (V) => S,
+                                                                       splitFunc: (V, V) => Boolean,
+                                                                       numPartitions: Int): RDD[(K, List[V])] = {
     val presess = rdd.map {
       case (lic, trip) => {
         ((lic, secondaryKeyFunc(trip)), trip)
       }
     }
     val partitioner = new FirstKeyPartitioner[K, S](numPartitions)
-    implicit val ordering: Ordering[(K,S)] = Ordering.by(_._1)
+    implicit val ordering: Ordering[(K, S)] = Ordering.by(_._1)
     presess.repartitionAndSortWithinPartitions(partitioner).mapPartitions(groupSorted(_, splitFunc))
   }
 
   def groupSorted[K, V, S](
-      it: Iterator[((K, S), V)],
-      splitFunc: (V, V) => Boolean): Iterator[(K, List[V])] = {
+                            it: Iterator[((K, S), V)],
+                            splitFunc: (V, V) => Boolean): Iterator[(K, List[V])] = {
     val res = List[(K, ArrayBuffer[V])]()
     it.foldLeft(res)((list, next) => list match {
       case Nil => {
@@ -194,7 +208,9 @@ object RunGeoTime extends Serializable {
 
 class FirstKeyPartitioner[K1, K2](partitions: Int) extends Partitioner {
   val delegate = new HashPartitioner(partitions)
+
   override def numPartitions = delegate.numPartitions
+
   override def getPartition(key: Any): Int = {
     val k = key.asInstanceOf[(K1, K2)]
     delegate.getPartition(k._1)
