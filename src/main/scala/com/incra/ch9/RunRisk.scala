@@ -32,7 +32,7 @@ object RunRisk {
     val conf = new SparkConf()
       .setAppName("VaR")
       .set("spark.executor.memory", "6g")
-      .setMaster("local[1]")
+      .setMaster("local[4]")
 
     val sc = new SparkContext(conf)
 
@@ -44,14 +44,15 @@ object RunRisk {
     plotDistribution(factorsReturns(2), "S&P 500")
     plotDistribution(factorsReturns(3), "NASDAQ")
 
-    val numTrials = 10000000
+    val numTrials = 10000000 // ten million!
     val parallelism = 1000
     val baseSeed = 1001L
 
-    /*
+    println("start the trials!")
     val trials = computeTrialReturns(stocksReturns, factorsReturns, sc, baseSeed, numTrials,
       parallelism)
     trials.cache()
+    println("trials are done!")
 
     val valueAtRisk = fivePercentVaR(trials)
     val conditionalValueAtRisk = fivePercentCVaR(trials)
@@ -65,7 +66,6 @@ object RunRisk {
     println("Kupiec test p-value: " + kupiecTestPValue(stocksReturns, valueAtRisk, 0.05))
 
     plotDistribution(trials)
-    */
   }
 
   def computeTrialReturns(
@@ -85,6 +85,7 @@ object RunRisk {
 
     // Generate different seeds so that our simulations don't all end up with the same results
     val seeds = (baseSeed until baseSeed + parallelism)
+    println(seeds.size)
     val seedRdd = sc.parallelize(seeds, parallelism)
 
     // Main computation: run simulations and compute aggregate return for each
@@ -109,12 +110,13 @@ object RunRisk {
     squaredReturns ++ squareRootedReturns ++ factorReturns
   }
 
+  // read and convert into two week returns
   def readStocksAndFactors(prefix: String): (Seq[Array[Double]], Seq[Array[Double]]) = {
     val start = new DateTime(2009, 10, 23, 0, 0)
     val end = new DateTime(2015, 8, 31, 0, 0)
 
     println("about to read stocks")
-    val rawStocks = readHistories(new File(prefix + "stocks/")).filter(_.size >= 260 * 5 + 10)
+    val rawStocks = readHistories(new File(prefix + "fullStocks/")).filter(_.size >= 260 * 5 + 10)
     val stocks = rawStocks.map(trimToRegion(_, start, end)).map(fillInHistory(_, start, end))
 
     println("about to read factors")
@@ -178,6 +180,7 @@ object RunRisk {
     instrumentTrialReturn
   }
 
+  // this makes the set of opening prices into two week returns
   def twoWeekReturns(history: Array[(DateTime, Double)]): Array[Double] = {
     history.sliding(10).map(window => window.last._2 - window.head._2).toArray
   }
