@@ -26,4 +26,6 @@ libraryDependencies += "org.apache.hadoop" % "hadoop-client" % "2.4.0"
 
 libraryDependencies += "com.cloudera.datascience" % "common" % "1.0.0"
 
+libraryDependencies += "org.scalanlp" % "breeze-viz_2.10" % "0.3"
+
 resolvers += Resolver.mavenLocal

@@ -29,24 +29,30 @@ import org.apache.spark.rdd.RDD
 object RunRisk {
   def main(args: Array[String]): Unit = {
     val sc = new SparkContext(new SparkConf().setAppName("VaR"))
+
     val (stocksReturns, factorsReturns) = readStocksAndFactors("./")
     plotDistribution(factorsReturns(2))
     plotDistribution(factorsReturns(3))
+
     val numTrials = 10000000
     val parallelism = 1000
     val baseSeed = 1001L
+
     val trials = computeTrialReturns(stocksReturns, factorsReturns, sc, baseSeed, numTrials,
       parallelism)
     trials.cache()
+
     val valueAtRisk = fivePercentVaR(trials)
     val conditionalValueAtRisk = fivePercentCVaR(trials)
     println("VaR 5%: " + valueAtRisk)
     println("CVaR 5%: " + conditionalValueAtRisk)
+
     val varConfidenceInterval = bootstrappedConfidenceInterval(trials, fivePercentVaR, 100, .05)
     val cvarConfidenceInterval = bootstrappedConfidenceInterval(trials, fivePercentCVaR, 100, .05)
     println("VaR confidence interval: " + varConfidenceInterval)
     println("CVaR confidence interval: " + cvarConfidenceInterval)
     println("Kupiec test p-value: " + kupiecTestPValue(stocksReturns, valueAtRisk, 0.05))
+
     plotDistribution(trials)
   }
 
