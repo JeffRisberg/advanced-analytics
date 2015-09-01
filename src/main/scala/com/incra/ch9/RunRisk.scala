@@ -39,8 +39,10 @@ object RunRisk {
     val base = "../../advanced-analytics/"
 
     val (stocksReturns, factorsReturns) = readStocksAndFactors(base)
-    plotDistribution(factorsReturns(2))
-    plotDistribution(factorsReturns(3))
+    plotDistribution(factorsReturns(0), "Oil")
+    plotDistribution(factorsReturns(1), "Treasuries")
+    plotDistribution(factorsReturns(2), "S&P 500")
+    plotDistribution(factorsReturns(3), "NASDAQ")
 
     val numTrials = 10000000
     val parallelism = 1000
@@ -267,7 +269,7 @@ object RunRisk {
     }).reverse.toArray
   }
 
-  def plotDistribution(samples: Array[Double]): Figure = {
+  def plotDistribution(samples: Array[Double], title: String): Figure = {
     val min = samples.min
     val max = samples.max
     // Using toList before toArray avoids a Scala bug
@@ -275,6 +277,11 @@ object RunRisk {
     val densities = KernelDensity.estimate(samples, domain)
     val f = Figure()
     val p = f.subplot(0)
+
+    p.title = title
+    p.xlabel = "x label"
+    p.ylabel = "y label"
+
     p += plot(domain, densities)
     p.xlabel = "Two Week Return ($)"
     p.ylabel = "Density"
