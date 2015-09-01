@@ -28,9 +28,17 @@ import org.apache.spark.rdd.RDD
 
 object RunRisk {
   def main(args: Array[String]): Unit = {
-    val sc = new SparkContext(new SparkConf().setAppName("VaR"))
 
-    val (stocksReturns, factorsReturns) = readStocksAndFactors("./")
+    val conf = new SparkConf()
+      .setAppName("VaR")
+      .set("spark.executor.memory", "6g")
+      .setMaster("local[1]")
+
+    val sc = new SparkContext(conf)
+
+    val base = "../../advanced-analytics/"
+
+    val (stocksReturns, factorsReturns) = readStocksAndFactors(base)
     plotDistribution(factorsReturns(2))
     plotDistribution(factorsReturns(3))
 
@@ -38,6 +46,7 @@ object RunRisk {
     val parallelism = 1000
     val baseSeed = 1001L
 
+    /*
     val trials = computeTrialReturns(stocksReturns, factorsReturns, sc, baseSeed, numTrials,
       parallelism)
     trials.cache()
@@ -54,15 +63,16 @@ object RunRisk {
     println("Kupiec test p-value: " + kupiecTestPValue(stocksReturns, valueAtRisk, 0.05))
 
     plotDistribution(trials)
+    */
   }
 
   def computeTrialReturns(
-      stocksReturns: Seq[Array[Double]],
-      factorsReturns: Seq[Array[Double]],
-      sc: SparkContext,
-      baseSeed: Long,
-      numTrials: Int,
-      parallelism: Int): RDD[Double] = {
+                           stocksReturns: Seq[Array[Double]],
+                           factorsReturns: Seq[Array[Double]],
+                           sc: SparkContext,
+                           baseSeed: Long,
+                           numTrials: Int,
+                           parallelism: Int): RDD[Double] = {
     val factorMat = factorMatrix(factorsReturns)
     val factorCov = new Covariance(factorMat).getCovarianceMatrix().getData()
     val factorMeans = factorsReturns.map(factor => factor.sum / factor.size).toArray
@@ -81,10 +91,10 @@ object RunRisk {
   }
 
   def computeFactorWeights(
-      stocksReturns: Seq[Array[Double]],
-      factorFeatures: Array[Array[Double]]): Array[Array[Double]] = {
+                            stocksReturns: Seq[Array[Double]],
+                            factorFeatures: Array[Array[Double]]): Array[Array[Double]] = {
     val models = stocksReturns.map(linearModel(_, factorFeatures))
-    val factorWeights = Array.ofDim[Double](stocksReturns.length, factorFeatures.head.length+1)
+    val factorWeights = Array.ofDim[Double](stocksReturns.length, factorFeatures.head.length + 1)
     for (s <- 0 until stocksReturns.length) {
       factorWeights(s) = models(s).estimateRegressionParameters()
     }
@@ -101,7 +111,7 @@ object RunRisk {
     val start = new DateTime(2009, 10, 23, 0, 0)
     val end = new DateTime(2014, 10, 23, 0, 0)
 
-    val rawStocks = readHistories(new File(prefix + "data/stocks/")).filter(_.size >= 260*5+10)
+    val rawStocks = readHistories(new File(prefix + "data/stocks/")).filter(_.size >= 260 * 5 + 10)
     val stocks = rawStocks.map(trimToRegion(_, start, end)).map(fillInHistory(_, start, end))
 
     val factorsPrefix = prefix + "data/factors/"
@@ -122,11 +132,11 @@ object RunRisk {
   }
 
   def trialReturns(
-      seed: Long,
-      numTrials: Int,
-      instruments: Seq[Array[Double]],
-      factorMeans: Array[Double],
-      factorCovariances: Array[Array[Double]]): Seq[Double] = {
+                    seed: Long,
+                    numTrials: Int,
+                    instruments: Seq[Array[Double]],
+                    factorMeans: Array[Double],
+                    factorCovariances: Array[Array[Double]]): Seq[Double] = {
     val rand = new MersenneTwister(seed)
     val multivariateNormal = new MultivariateNormalDistribution(rand, factorMeans,
       factorCovariances)
@@ -158,7 +168,7 @@ object RunRisk {
     var instrumentTrialReturn = instrument(0)
     var i = 0
     while (i < trial.length) {
-      instrumentTrialReturn += trial(i) * instrument(i+1)
+      instrumentTrialReturn += trial(i) * instrument(i + 1)
       i += 1
     }
     instrumentTrialReturn
@@ -295,10 +305,10 @@ object RunRisk {
   }
 
   def bootstrappedConfidenceInterval(
-      trials: RDD[Double],
-      computeStatistic: RDD[Double] => Double,
-      numResamples: Int,
-      pValue: Double): (Double, Double) = {
+                                      trials: RDD[Double],
+                                      computeStatistic: RDD[Double] => Double,
+                                      numResamples: Int,
+                                      pValue: Double): (Double, Double) = {
     val stats = (0 until numResamples).map { i =>
       val resample = trials.sample(true, 1.0)
       computeStatistic(resample)
@@ -329,9 +339,9 @@ object RunRisk {
   }
 
   def kupiecTestPValue(
-      stocksReturns: Seq[Array[Double]],
-      valueAtRisk: Double,
-      confidenceLevel: Double): Double = {
+                        stocksReturns: Seq[Array[Double]],
+                        valueAtRisk: Double,
+                        confidenceLevel: Double): Double = {
     val failures = countFailures(stocksReturns, valueAtRisk)
     val total = stocksReturns(0).size
     val testStatistic = kupiecTestStatistic(total, failures, confidenceLevel)
