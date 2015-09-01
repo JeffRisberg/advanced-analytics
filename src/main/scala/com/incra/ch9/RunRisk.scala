@@ -109,12 +109,14 @@ object RunRisk {
 
   def readStocksAndFactors(prefix: String): (Seq[Array[Double]], Seq[Array[Double]]) = {
     val start = new DateTime(2009, 10, 23, 0, 0)
-    val end = new DateTime(2014, 10, 23, 0, 0)
+    val end = new DateTime(2015, 8, 31, 0, 0)
 
-    val rawStocks = readHistories(new File(prefix + "data/stocks/")).filter(_.size >= 260 * 5 + 10)
+    println("about to read stocks")
+    val rawStocks = readHistories(new File(prefix + "stocks/")).filter(_.size >= 260 * 5 + 10)
     val stocks = rawStocks.map(trimToRegion(_, start, end)).map(fillInHistory(_, start, end))
 
-    val factorsPrefix = prefix + "data/factors/"
+    println("about to read factors")
+    val factorsPrefix = prefix + "factors/"
     val factors1 = Array("crudeoil.tsv", "us30yeartreasurybonds.tsv").
       map(x => new File(factorsPrefix + x)).
       map(readInvestingDotComHistory)
