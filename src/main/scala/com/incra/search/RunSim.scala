@@ -16,10 +16,10 @@ import org.apache.spark.rdd.RDD
  * Created by jeff on 9/7/15.
  */
 
-case class Vehicle(var x: Double,
-                   var y: Double,
-                   var dX: Double,
-                   var dY: Double) {
+case class Target(var x: Double,
+                  var y: Double,
+                  var dX: Double,
+                  var dY: Double) {
   def step(dt: Double): Unit = {
     x = x + dX
     y = y + dY
@@ -38,10 +38,8 @@ object RunSim extends Serializable {
     val baseSeed = 1001L
 
     println("start the trials!")
-    // This is done in parallel
     val endpoints = computeTrialReturns(sc, numTimesteps, baseSeed, numTrials, parallelism)
     endpoints.cache()
-    println("trials are done!")
 
     // This is done in parallel
     val endCells = endpoints.map(endpoint => {
@@ -57,10 +55,12 @@ object RunSim extends Serializable {
     val grid = Array.fill(15, 15)(0)
 
     // We call collect to convert RDD to cell counts in master process
+    println("computation begins here")
     counts.collect.foreach { case ((x, y), count) =>
       if (x >= 0 && x < 15 && y >= 0 && y < 15)
         grid(x)(y) = count;
     }
+    println("computation ends here")
 
     grid foreach {
       row => {
@@ -74,7 +74,7 @@ object RunSim extends Serializable {
                           numTimesteps: Int,
                           baseSeed: Long,
                           numTrials: Int,
-                          parallelism: Int): RDD[Vehicle] = {
+                          parallelism: Int): RDD[Target] = {
 
     // Generate different seeds so that our simulations don't all end up with the same results
     val seeds = (baseSeed until baseSeed + parallelism)
@@ -85,10 +85,10 @@ object RunSim extends Serializable {
       trialResults(_, numTimesteps, numTrials / parallelism))
   }
 
-  def trialResults(seed: Long, numTimesteps: Int, numTrials: Int): Seq[Vehicle] = {
+  def trialResults(seed: Long, numTimesteps: Int, numTrials: Int): Seq[Target] = {
 
     val rand = new MersenneTwister(seed)
-    val trialReturns = new Array[Vehicle](numTrials)
+    val trialReturns = new Array[Target](numTrials)
 
     val positionDistribution = new NormalDistribution(rand, 50.0, 1.0, 0.0)
     val speedDistribution = new NormalDistribution(rand, 6.0, 1.0, 0.0)
@@ -99,7 +99,7 @@ object RunSim extends Serializable {
       val dX = speedDistribution.sample()
       val dY = speedDistribution.sample()
 
-      val vehicle = Vehicle(x, y, dX, dY)
+      val vehicle = Target(x, y, dX, dY)
       for (t <- 1 until numTimesteps) {
         vehicle.step(1.0)
       }
