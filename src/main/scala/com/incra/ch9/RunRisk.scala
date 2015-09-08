@@ -90,7 +90,7 @@ object RunRisk {
 
     // Main computation: run simulations and compute aggregate return for each
     seedRdd.flatMap(
-      trialReturns(_, numTrials / parallelism, bInstruments.value, factorMeans, factorCov))
+      trialResults(_, numTrials / parallelism, bInstruments.value, factorMeans, factorCov))
   }
 
   def computeFactorWeights(
@@ -137,15 +137,14 @@ object RunRisk {
     (stockReturns, factorReturns)
   }
 
-  def trialReturns(
+  def trialResults(
                     seed: Long,
                     numTrials: Int,
                     instruments: Seq[Array[Double]],
                     factorMeans: Array[Double],
                     factorCovariances: Array[Array[Double]]): Seq[Double] = {
     val rand = new MersenneTwister(seed)
-    val multivariateNormal = new MultivariateNormalDistribution(rand, factorMeans,
-      factorCovariances)
+    val multivariateNormal = new MultivariateNormalDistribution(rand, factorMeans, factorCovariances)
 
     val trialReturns = new Array[Double](numTrials)
     for (i <- 0 until numTrials) {
