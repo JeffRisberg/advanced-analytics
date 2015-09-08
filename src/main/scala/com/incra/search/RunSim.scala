@@ -92,6 +92,7 @@ object RunSim extends Serializable {
 
     val positionDistribution = new NormalDistribution(rand, 50.0, 1.0, 0.0)
     val speedDistribution = new NormalDistribution(rand, 6.0, 1.0, 0.0)
+    // limit the speed to be > stallspeed and < speed of sound
 
     for (i <- 0 until numTrials) {
       val x = positionDistribution.sample()
@@ -99,12 +100,12 @@ object RunSim extends Serializable {
       val dX = speedDistribution.sample()
       val dY = speedDistribution.sample()
 
-      val vehicle = Target(x, y, dX, dY)
+      val target = Target(x, y, dX, dY)
       for (t <- 1 until numTimesteps) {
-        vehicle.step(1.0)
+        target.step(1.0)
       }
 
-      trialReturns(i) = vehicle
+      trialReturns(i) = target
     }
     trialReturns
   }
