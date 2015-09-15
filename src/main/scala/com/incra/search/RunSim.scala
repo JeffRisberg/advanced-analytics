@@ -8,7 +8,7 @@ import org.apache.commons.math3.random.MersenneTwister
 //import com.incra.ch2.MatchData
 //import com.incra.ch2.NAStatCounter
 
-import org.apache.spark.SparkContext
+import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.util.StatCounter
 import org.apache.spark.rdd.RDD
 
@@ -16,7 +16,7 @@ import org.apache.spark.rdd.RDD
  * Created by jeff on 9/7/15.
  */
 
-case class Target(var x: Double,
+case class Particle(var x: Double,
                   var y: Double,
                   var dX: Double,
                   var dY: Double) {
@@ -29,8 +29,12 @@ case class Target(var x: Double,
 object RunSim extends Serializable {
 
   def main(args: Array[String]): Unit = {
-    /* init the sparkContext */
-    val sc = new SparkContext("local", "SearchSim", System.getenv("SPARK_HOME"))
+    val conf = new SparkConf()
+      .setAppName("SearchSim")
+      .set("spark.executor.memory", "6g")
+      .setMaster("local[4]")
+
+    val sc = new SparkContext(conf)
 
     val numTimesteps = 1000
     val numTrials = 10000 // should be ten million!
@@ -74,7 +78,7 @@ object RunSim extends Serializable {
                           numTimesteps: Int,
                           baseSeed: Long,
                           numTrials: Int,
-                          parallelism: Int): RDD[Target] = {
+                          parallelism: Int): RDD[Particle] = {
 
     // Generate different seeds so that our simulations don't all end up with the same results
     val seeds = (baseSeed until baseSeed + parallelism)
@@ -85,10 +89,10 @@ object RunSim extends Serializable {
       trialResults(_, numTimesteps, numTrials / parallelism))
   }
 
-  def trialResults(seed: Long, numTimesteps: Int, numTrials: Int): Seq[Target] = {
+  def trialResults(seed: Long, numTimesteps: Int, numTrials: Int): Seq[Particle] = {
 
     val rand = new MersenneTwister(seed)
-    val trialReturns = new Array[Target](numTrials)
+    val trialReturns = new Array[Particle](numTrials)
 
     val positionDistribution = new NormalDistribution(rand, 50.0, 1.0, 0.0)
     val speedDistribution = new NormalDistribution(rand, 6.0, 1.0, 0.0)
@@ -100,7 +104,7 @@ object RunSim extends Serializable {
       val dX = speedDistribution.sample()
       val dY = speedDistribution.sample()
 
-      val target = Target(x, y, dX, dY)
+      val target = Particle(x, y, dX, dY)
       for (t <- 1 until numTimesteps) {
         target.step(1.0)
       }
