@@ -22,6 +22,8 @@ object RunLoanDefaultPredictor {
 
   var loanStatusIndex = 0
   var isBorrowerHomeownerIndex = 0
+  var isEmployedIndex = 0
+  var employmentStatusDurationIndex = 0
   var loanOriginalAmountIndex = 0
   var amountDelinquentIndex = 0
   var delinquenciesLast7YearsIndex = 0
@@ -51,6 +53,8 @@ object RunLoanDefaultPredictor {
     header foreach println
 
     loanStatusIndex = header.indexOf("LoanStatus")
+    isEmployedIndex = header.indexOf("EmploymentStatus")
+    employmentStatusDurationIndex = header.indexOf("EmploymentStatusDuration")
     isBorrowerHomeownerIndex = header.indexOf("IsBorrowerHomeowner")
     loanOriginalAmountIndex = header.indexOf("LoanOriginalAmount")
     amountDelinquentIndex = header.indexOf("AmountDelinquent")
@@ -79,13 +83,15 @@ object RunLoanDefaultPredictor {
     println("Typical input record:")
     println("  Good/Bad status " + (if (labeledPointsGood.first.label == 1.0) "Good" else "Bad"))
     println("  IsBorrowerHomeowner " + labeledPointsGood.first.features(0))
-    println("  LoanOriginalAmount " + labeledPointsGood.first.features(1))
-    println("  AmountDelinquent " + labeledPointsGood.first.features(2))
-    println("  DelinquenciesLast7YearsIndex " + labeledPointsGood.first.features(3))
-    println("  CreditScoreRangeLower " + labeledPointsGood.first.features(4))
-    println("  StatedMonthlyIncome " + labeledPointsGood.first.features(5))
-    println("  IncomeToAmountRatio " + labeledPointsGood.first.features(6))
-    println("  DebtToIncomeRatio " + labeledPointsGood.first.features(7))
+    println("  IsEmployed " + labeledPointsGood.first.features(1))
+    println("  employmentStatusDuration " + labeledPointsGood.first.features(2))
+    println("  LoanOriginalAmount " + labeledPointsGood.first.features(3))
+    println("  AmountDelinquent " + labeledPointsGood.first.features(4))
+    println("  DelinquenciesLast7YearsIndex " + labeledPointsGood.first.features(5))
+    println("  CreditScoreRangeLower " + labeledPointsGood.first.features(6))
+    println("  StatedMonthlyIncome " + labeledPointsGood.first.features(7))
+    println("  IncomeToAmountRatio " + labeledPointsGood.first.features(8))
+    println("  DebtToIncomeRatio " + labeledPointsGood.first.features(9))
 
     val numIterations = 100
     val regParam = 0.1
@@ -147,9 +153,11 @@ object RunLoanDefaultPredictor {
 
   def parse(data: Array[String]): LabeledPoint = {
     val loanStatus = data(loanStatusIndex)
-    val loanBad = List("Past Due (1-15 days)", "Chargedoff", "Delinquent").contains(loanStatus)
+    val loanGood = List("Current", "Completed", "FinalPaymentInProgress", "Cancelled").contains(loanStatus)
 
     val isBorrowerHomeowner = if (data(isBorrowerHomeownerIndex) == "True") 1.0 else 0.0
+    val isEmployed = if (data(isEmployedIndex) == "Employed") 1.0 else 0.0
+    var employmentStatusDuration = data(employmentStatusDurationIndex).toDouble
     val originalAmount = data(loanOriginalAmountIndex).toDouble
     val amountDelinquent = data(amountDelinquentIndex).toDouble
     val delinquenciesLast7Years = data(delinquenciesLast7YearsIndex).toDouble
@@ -158,11 +166,13 @@ object RunLoanDefaultPredictor {
     val incomeToAmountRatio = statedMonthlyIncome / originalAmount
     val debtToIncomeRatio = data(debtToIncomeRatioIndex).toDouble
 
-    val label = if (loanBad) 0.0 else 1.0
-    val numFeatures = 8
-    var indices = Array(0, 1, 2, 3, 4, 5, 6, 7)
-    var values = Array(isBorrowerHomeowner, originalAmount, amountDelinquent,
-      delinquenciesLast7Years, creditScoreRangeLower, statedMonthlyIncome, incomeToAmountRatio, debtToIncomeRatio)
+    val label = if (loanGood) 1.0 else 0.0
+    val numFeatures = 10
+    val indices = Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
+    val values = Array(isBorrowerHomeowner, isEmployed, employmentStatusDuration,
+      originalAmount, amountDelinquent,
+      delinquenciesLast7Years, creditScoreRangeLower,
+      statedMonthlyIncome, incomeToAmountRatio, debtToIncomeRatio)
 
     LabeledPoint(label, Vectors.sparse(numFeatures, indices, values))
   }
