@@ -1,4 +1,3 @@
-
 package com.incra.ch10
 
 import java.io.File
@@ -16,7 +15,15 @@ import scala.annotation.tailrec
 
 object RunTFPrediction {
   def main(args: Array[String]) {
-    val sc = new SparkContext(new SparkConf().setAppName("TF Prediction"))
+
+    val conf = new SparkConf()
+      .setAppName("TF Prediction")
+      .set("spark.executor.memory", "6g")
+      .setMaster("local[4]")
+
+    val sc = new SparkContext(conf)
+
+    val base = "../../advanced-analytics/genetic/"
 
     // Load the human genome reference sequence
     val bHg19Data = sc.broadcast(
@@ -43,23 +50,23 @@ object RunTFPrediction {
     // CTCF PWM from http://dx.doi.org/10.1016/j.cell.2012.12.009
     // generated with genomics/src/main/python/pwm.py
     val bPwmData = sc.broadcast(Vector(
-      Map('A'->0.4553,'C'->0.0459,'G'->0.1455,'T'->0.3533),
-      Map('A'->0.1737,'C'->0.0248,'G'->0.7592,'T'->0.0423),
-      Map('A'->0.0001,'C'->0.9407,'G'->0.0001,'T'->0.0591),
-      Map('A'->0.0051,'C'->0.0001,'G'->0.9879,'T'->0.0069),
-      Map('A'->0.0624,'C'->0.9322,'G'->0.0009,'T'->0.0046),
-      Map('A'->0.0046,'C'->0.9952,'G'->0.0001,'T'->0.0001),
-      Map('A'->0.5075,'C'->0.4533,'G'->0.0181,'T'->0.0211),
-      Map('A'->0.0079,'C'->0.6407,'G'->0.0001,'T'->0.3513),
-      Map('A'->0.0001,'C'->0.9995,'G'->0.0002,'T'->0.0001),
-      Map('A'->0.0027,'C'->0.0035,'G'->0.0017,'T'->0.9921),
-      Map('A'->0.7635,'C'->0.0210,'G'->0.1175,'T'->0.0980),
-      Map('A'->0.0074,'C'->0.1314,'G'->0.7990,'T'->0.0622),
-      Map('A'->0.0138,'C'->0.3879,'G'->0.0001,'T'->0.5981),
-      Map('A'->0.0003,'C'->0.0001,'G'->0.9853,'T'->0.0142),
-      Map('A'->0.0399,'C'->0.0113,'G'->0.7312,'T'->0.2177),
-      Map('A'->0.1520,'C'->0.2820,'G'->0.0082,'T'->0.5578),
-      Map('A'->0.3644,'C'->0.3105,'G'->0.2125,'T'->0.1127)))
+      Map('A' -> 0.4553, 'C' -> 0.0459, 'G' -> 0.1455, 'T' -> 0.3533),
+      Map('A' -> 0.1737, 'C' -> 0.0248, 'G' -> 0.7592, 'T' -> 0.0423),
+      Map('A' -> 0.0001, 'C' -> 0.9407, 'G' -> 0.0001, 'T' -> 0.0591),
+      Map('A' -> 0.0051, 'C' -> 0.0001, 'G' -> 0.9879, 'T' -> 0.0069),
+      Map('A' -> 0.0624, 'C' -> 0.9322, 'G' -> 0.0009, 'T' -> 0.0046),
+      Map('A' -> 0.0046, 'C' -> 0.9952, 'G' -> 0.0001, 'T' -> 0.0001),
+      Map('A' -> 0.5075, 'C' -> 0.4533, 'G' -> 0.0181, 'T' -> 0.0211),
+      Map('A' -> 0.0079, 'C' -> 0.6407, 'G' -> 0.0001, 'T' -> 0.3513),
+      Map('A' -> 0.0001, 'C' -> 0.9995, 'G' -> 0.0002, 'T' -> 0.0001),
+      Map('A' -> 0.0027, 'C' -> 0.0035, 'G' -> 0.0017, 'T' -> 0.9921),
+      Map('A' -> 0.7635, 'C' -> 0.0210, 'G' -> 0.1175, 'T' -> 0.0980),
+      Map('A' -> 0.0074, 'C' -> 0.1314, 'G' -> 0.7990, 'T' -> 0.0622),
+      Map('A' -> 0.0138, 'C' -> 0.3879, 'G' -> 0.0001, 'T' -> 0.5981),
+      Map('A' -> 0.0003, 'C' -> 0.0001, 'G' -> 0.9853, 'T' -> 0.0142),
+      Map('A' -> 0.0399, 'C' -> 0.0113, 'G' -> 0.7312, 'T' -> 0.2177),
+      Map('A' -> 0.1520, 'C' -> 0.2820, 'G' -> 0.0082, 'T' -> 0.5578),
+      Map('A' -> 0.3644, 'C' -> 0.3105, 'G' -> 0.2125, 'T' -> 0.1127)))
 
     // Define some utility functions
 
@@ -139,15 +146,15 @@ object RunTFPrediction {
         .groupBy(x => x._1.getFeatureId)
         // compute conservation stats on each peak
         .map(x => {
-          val y = x._2.toSeq
-          val peak = y(0)._1
-          val values = y.map(_._2.getValue)
-          // compute phylop features
-          val avg = values.reduce(_ + _) / values.length
-          val m = values.max
-          val M = values.min
-          (peak.getFeatureId, peak, avg, m, M)
-        })
+        val y = x._2.toSeq
+        val peak = y(0)._1
+        val values = y.map(_._2.getValue)
+        // compute phylop features
+        val avg = values.reduce(_ + _) / values.length
+        val m = values.max
+        val M = values.min
+        (peak.getFeatureId, peak, avg, m, M)
+      })
 
       dnaseWithPhylopRDD.map(tup => {
         val peak = tup._2
