@@ -15,24 +15,26 @@ object FilterScala {
     var z = new ScalaFilterExample()
     var t = new ScalaFilterExample()
     var w = new ScalaFilterExample()
+    var a = new ScalaFilterExample()
+    var b = new ScalaFilterExample()
+
     val elapsed = System.currentTimeMillis() - start
     println("Total " + elapsed)
   }
 }
 
-class ScalaFilterExample[@specialized(Int) T] {
+class ScalaFilterExample {
   val start = System.currentTimeMillis()
 
-  var i = 0
-  while (i < 10000) {
+  for (i <- Range(0, 100)) {
     val states = List("NY", "CA", "NJ", "OH", "OK", "MA", "TX", "MN", "ORE", "FL", "CT", "PA", "WA", "VA", "ME", "VT", "NH", "NV")
 
     val validStates = states.withFilter { state => state.size == 2 }
     val hawaii = validStates.withFilter { state => state == "HI" }
+    hawaii.toString()
     //println(hawaii.size)
-
-    i = i + 1
   }
+
   val elapsed = System.currentTimeMillis() - start
   println(elapsed)
 }

@@ -16,6 +16,8 @@ public class FilterJava {
         new JavaFilterExample();
         new JavaFilterExample();
         new JavaFilterExample();
+        new JavaFilterExample();
+        new JavaFilterExample();
 
         long elapsed = System.currentTimeMillis() - start;
         System.out.println("Total " + elapsed);
@@ -37,8 +39,10 @@ class JavaFilterExample {
             for (String state : validStates) {
                 if (state.equals("HI")) hawaii.add(state);
             }
+            hawaii.toString();
             //System.out.println(validStates.size());
         }
+
         long elapsed = System.currentTimeMillis() - start;
         System.out.println(elapsed);
     }
