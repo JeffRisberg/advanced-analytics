@@ -40,7 +40,7 @@ object RunLoanDefaultPredictor {
     val conf = new SparkConf()
       .setAppName("RunPredictor")
       .set("spark.executor.memory", "6g")
-      .setMaster("local[4]")
+      .setMaster("local[1]")
     val sc = new SparkContext(conf)
 
     Logger.getRootLogger.setLevel(Level.WARN)
@@ -169,11 +169,11 @@ object RunLoanDefaultPredictor {
     val label = if (loanGood) 1.0 else 0.0
     val numFeatures = 10
     val indices = Array(0, 1, 2, 3, 4, 5, 6, 7, 8, 9)
-    val values = Array(isBorrowerHomeowner, isEmployed, employmentStatusDuration,
+    val features = Array(isBorrowerHomeowner, isEmployed, employmentStatusDuration,
       originalAmount, amountDelinquent,
       delinquenciesLast7Years, creditScoreRangeLower,
       statedMonthlyIncome, incomeToAmountRatio, debtToIncomeRatio)
 
-    LabeledPoint(label, Vectors.sparse(numFeatures, indices, values))
+    LabeledPoint(label, Vectors.sparse(numFeatures, indices, features))
   }
 }
