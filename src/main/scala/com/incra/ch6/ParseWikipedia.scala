@@ -6,7 +6,7 @@
 
 package com.incra.ch6
 
-//import com.cloudera.datascience.common.XmlInputFormat
+import com.cloudera.datascience.common.XmlInputFormat
 
 import edu.stanford.nlp.ling.CoreAnnotations.{LemmaAnnotation, SentencesAnnotation, TokensAnnotation}
 import edu.stanford.nlp.pipeline.{Annotation, StanfordCoreNLP}
