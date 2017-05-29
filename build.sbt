@@ -10,14 +10,16 @@ libraryDependencies += "com.github.scopt" %% "scopt" % "3.2.0"
 
 libraryDependencies += "org.apache.spark" %% "spark-core" % "1.3.1"
 
+libraryDependencies += "org.apache.hadoop" % "hadoop-common" % "2.6.0" excludeAll (
+  ExclusionRule(organization = "org.eclipse.jetty")
+  )
+
 libraryDependencies += "org.apache.spark" %% "spark-mllib" % "1.3.1"
 
 // NLP
 libraryDependencies += "edu.stanford.nlp" % "stanford-corenlp" % "3.3.1"
 
 libraryDependencies += "edu.stanford.nlp" % "stanford-corenlp" % "3.3.1" classifier "models"
-
-libraryDependencies += "org.apache.hadoop" % "hadoop-client" % "2.4.0"
 
 // GraphX
 libraryDependencies += "org.apache.spark" %% "spark-graphx" % "1.3.1"
